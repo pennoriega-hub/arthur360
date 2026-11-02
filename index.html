@@ -59,13 +59,17 @@ nav .add{width:56px;height:56px;border-radius:50%;background:var(--sec);color:#f
 .seg{display:flex;background:var(--soft);border-radius:12px;padding:3px;margin-bottom:12px}
 .seg button{flex:1;border:0;background:none;padding:9px;border-radius:10px;font:inherit;font-size:13px;font-weight:600;color:var(--mut)}
 .seg button.on{background:var(--pri);color:#fff}
-.amt{text-align:center;font-size:40px;font-weight:700;padding:6px 0 10px}
+.amt{text-align:center;font-size:40px;font-weight:700;padding:6px 0 10px;word-break:break-all;line-height:1.15}
+.amt.largo{font-size:28px}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px}
 .chip{border:1px solid var(--pri2);background:var(--soft);color:#fff;border-radius:20px;padding:7px 12px;font:inherit;font-size:13px;white-space:nowrap}
 .chip.on{background:var(--sec);color:#fff;border-color:var(--sec);font-weight:600}
 .fl{font-size:12px;color:var(--mut);font-weight:600;margin:6px 0}
 input.note{width:100%;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:10px;font:inherit;font-size:14px;margin-bottom:10px}
-.keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.keys button.op{background:var(--pri);color:#fff;font-size:24px}
+.keys button.eq{background:var(--sec);color:#fff;font-size:24px}
+.amtres{text-align:center;font-size:15px;color:var(--mut);margin:-8px 0 8px;min-height:20px}
 .keys button{border:0;background:var(--soft);color:#fff;border-radius:12px;height:50px;font:inherit;font-size:20px;font-weight:500}
 .save{width:100%;border:0;background:var(--pri2);color:#fff;border-radius:14px;height:52px;font:inherit;font-size:16px;font-weight:600;margin-top:10px}
 .save:disabled{opacity:.4}
@@ -174,7 +178,7 @@ input[type=date].note{color-scheme:dark}
     <button class="btn danger full" onclick="confirmar('¿Borrar todos los movimientos? Cuentas y categorías se mantienen.',()=>{MOVS=[];guardarTodo('Movimientos borrados')},'Borrar')">🗑 Borrar todos los movimientos</button>
     <small class="hint" id="ultResp" style="margin-top:8px"></small>
   </div>
-  <p class="proto">Arthur360 · v1.0</p>
+  <p class="proto">Arthur360 · v1.1</p>
 </section>
 
 <nav>
@@ -195,6 +199,7 @@ input[type=date].note{color-scheme:dark}
     <button data-t="transf">Transferencia</button>
   </div>
   <div class="amt" id="amt">S/ 0</div>
+  <div class="amtres" id="amtRes"></div>
   <div class="fl" id="lblCuenta">Cuenta</div>
   <div class="chips" id="chCuenta"></div>
   <div id="boxDestino" style="display:none"><div class="fl">Hacia la cuenta</div><div class="chips" id="chDestino"></div></div>
@@ -301,12 +306,12 @@ function popNav(){if(pushed){pushed=false;try{history.back()}catch(e){}}}
 window.addEventListener('popstate',()=>{pushed=false;cerrarUI();cerrarModalUI()});
 function abrirSheet(){document.getElementById('bg').style.display='block';document.getElementById('sheet').classList.add('on');document.getElementById('sheet').scrollTop=0;pushNav()}
 function abrir(){if(!CUENTAS.length)return toast('Primero crea una cuenta en Ajustes');
- F={id:null,t:'gasto',monto:'',c:CUENTAS[0].id,dest:CUENTAS[1]?.id,cat:null,sub:null};
+ F={id:null,reemplazar:false,t:'gasto',monto:'',c:CUENTAS[0].id,dest:CUENTAS[1]?.id,cat:null,sub:null};
  document.getElementById('nota').value='';document.getElementById('fecha').value=hoyISO();
  document.getElementById('shTitle').textContent='Nuevo movimiento';document.getElementById('shDel').style.display='none';
  pintarForm();abrirSheet()}
 function editarMov(id){const m=MOVS.find(x=>x.id===id);if(!m)return;
- F={id,t:m.t,monto:String(m.m),c:m.c,dest:m.dest||CUENTAS.find(c=>c.id!==m.c)?.id,cat:m.cat||null,sub:m.sub||null};
+ F={id,reemplazar:true,t:m.t,monto:String(m.m),c:m.c,dest:m.dest||CUENTAS.find(c=>c.id!==m.c)?.id,cat:m.cat||null,sub:m.sub||null};
  document.getElementById('nota').value=m.nota||'';document.getElementById('fecha').value=m.f;
  document.getElementById('shTitle').textContent='Editar movimiento';document.getElementById('shDel').style.display='block';
  pintarForm();abrirSheet()}
@@ -316,7 +321,9 @@ function cerrar(){cerrarUI();if(!document.getElementById('modal').classList.cont
 function chips(el,items,sel,fn){document.getElementById(el).innerHTML=items.map(i=>`<button class="chip ${sel===i.v?'on':''}" data-v="${esc(i.v)}">${esc(i.l)}</button>`).join('');document.querySelectorAll('#'+el+' .chip').forEach(b=>b.onclick=()=>fn(b.dataset.v))}
 function pintarForm(){
  document.querySelectorAll('#tipoSeg button').forEach(b=>b.classList.toggle('on',b.dataset.t===F.t));
- const n=parseFloat(F.monto||'0');document.getElementById('amt').textContent='S/ '+(F.monto||'0');
+ const n=evaluar(F.monto);const amt=document.getElementById('amt');amt.textContent='S/ '+verExpr(F.monto);amt.classList.toggle('largo',(F.monto||'').length>12);
+ const res=document.getElementById('amtRes');
+ if(tieneOp(F.monto||'')){res.innerHTML=n>0?`= <b style="color:#fff">${fmt(n)}</b>`:'<span style="color:var(--gas)">El resultado debe ser mayor a 0</span>'}else res.textContent='';
  document.getElementById('amt').style.color=F.t==='gasto'?'var(--gas)':F.t==='ingreso'?'var(--ing)':'var(--sec)';
  const tr=F.t==='transf';
  document.getElementById('lblCuenta').textContent=tr?'Desde la cuenta':'Cuenta';
@@ -330,14 +337,26 @@ function pintarForm(){
  const ok=n>0&&(tr?F.dest&&F.dest!==F.c:F.sub);document.getElementById('btnSave').disabled=!ok;
 }
 document.querySelectorAll('#tipoSeg button').forEach(b=>b.onclick=()=>{F.t=b.dataset.t;F.cat=null;F.sub=null;if(F.dest===F.c)F.dest=CUENTAS.find(c=>c.id!==F.c)?.id;pintarForm()});
-document.getElementById('keys').innerHTML=['1','2','3','4','5','6','7','8','9','.','0','⌫'].map(k=>`<button>${k}</button>`).join('');
-document.querySelectorAll('#keys button').forEach(b=>b.onclick=()=>{const k=b.textContent;
- if(k==='⌫')F.monto=F.monto.slice(0,-1);
- else if(k==='.'){if(!F.monto.includes('.'))F.monto=(F.monto||'0')+'.'}
- else{if(F.monto.includes('.')&&F.monto.split('.')[1].length>=2)return;if(F.monto.length<9)F.monto=(F.monto==='0'?'':F.monto)+k}
- pintarForm()});
+const evaluar=e=>{if(!e)return 0;const t=e.replace(/[+\-]$/,'').match(/[+\-]?[^+\-]+/g)||[];return Math.round(t.reduce((a,x)=>a+(parseFloat(x)||0),0)*100)/100};
+const tieneOp=e=>/[0-9.][+\-]/.test(e);
+const verExpr=e=>(e||'0').replace(/\+/g,' + ').replace(/-/g,' − ');
+const KEYS=['1','2','3','⌫','4','5','6','−','7','8','9','+','C','0','.','='];
+document.getElementById('keys').innerHTML=KEYS.map(k=>`<button class="${k==='+'||k==='−'?'op':k==='='?'eq':''}" data-k="${k}">${k}</button>`).join('');
+document.querySelectorAll('#keys button').forEach(b=>b.onclick=()=>{let k=b.dataset.k;if(k==='−')k='-';
+ let e=F.monto||'';
+ if(F.reemplazar&&(/[0-9.]/.test(k)))e='';
+ F.reemplazar=false;
+ const seg=e.split(/[+\-]/).pop();
+ if(k==='⌫')e=e.slice(0,-1);
+ else if(k==='C')e='';
+ else if(k==='='){if(tieneOp(e)){const r=evaluar(e);if(r<=0){toast('El resultado debe ser mayor a 0');return}e=String(r)}}
+ else if(k==='+'||k==='-'){if(!e)return;if(/[+\-]$/.test(e))e=e.slice(0,-1)+k;else if(e.endsWith('.'))e=e.slice(0,-1)+k;else e+=k}
+ else if(k==='.'){if(!seg.includes('.'))e+=(seg===''?'0.':'.')}
+ else{if(seg.includes('.')&&seg.split('.')[1].length>=2)return;if(seg.replace('.','').length>=9)return;if(seg==='0')e=e.slice(0,-1);e+=k}
+ if(e.length>60)return;
+ F.monto=e;pintarForm()});
 function guardar(){
- const mv={id:F.id||nid(),t:F.t,c:F.c,m:Math.round(parseFloat(F.monto)*100)/100,f:document.getElementById('fecha').value||hoyISO(),nota:document.getElementById('nota').value.trim()};
+ const mv={id:F.id||nid(),t:F.t,c:F.c,m:evaluar(F.monto),f:document.getElementById('fecha').value||hoyISO(),nota:document.getElementById('nota').value.trim()};
  if(F.t==='transf')mv.dest=F.dest;else{mv.cat=F.cat;mv.sub=F.sub}
  if(F.t==='transf'&&mv.dest===mv.c)return;
  if(F.id){const k=MOVS.findIndex(x=>x.id===F.id);MOVS[k]=mv}else MOVS.push(mv);
