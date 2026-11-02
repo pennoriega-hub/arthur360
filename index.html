@@ -109,6 +109,12 @@ input[type=date].note{color-scheme:dark}
 .mv{cursor:pointer}
 .welcome{border-color:var(--sec)!important}
 .welcome p{font-size:14px;color:var(--mut);margin:6px 0 10px}
+.tc{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.tc div{background:var(--soft);border-radius:10px;padding:7px 8px}
+.tc span{display:block;font-size:10px;color:var(--sec);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.tc b{font-size:13px}
+.acc .bar{margin:8px 0 0}
+.cdisp{font-size:12px;color:var(--mut);margin:-4px 0 8px}
 .proto{font-size:11px;text-align:center;color:var(--mut);padding:6px}
 </style>
 </head>
@@ -178,7 +184,7 @@ input[type=date].note{color-scheme:dark}
     <button class="btn danger full" onclick="confirmar('¿Borrar todos los movimientos? Cuentas y categorías se mantienen.',()=>{MOVS=[];guardarTodo('Movimientos borrados')},'Borrar')">🗑 Borrar todos los movimientos</button>
     <small class="hint" id="ultResp" style="margin-top:8px"></small>
   </div>
-  <p class="proto">Arthur360 · v1.1</p>
+  <p class="proto">Arthur360 · v1.2</p>
 </section>
 
 <nav>
@@ -202,6 +208,7 @@ input[type=date].note{color-scheme:dark}
   <div class="amtres" id="amtRes"></div>
   <div class="fl" id="lblCuenta">Cuenta</div>
   <div class="chips" id="chCuenta"></div>
+  <div class="cdisp" id="cDisp"></div>
   <div id="boxDestino" style="display:none"><div class="fl">Hacia la cuenta</div><div class="chips" id="chDestino"></div></div>
   <div id="boxCat">
     <div class="fl">Categoría</div><div class="chips" id="chCat"></div>
@@ -254,6 +261,7 @@ function saldo(cid){
  MOVS.forEach(m=>{if(m.t==='ingreso'&&m.c===cid)s+=m.m;if(m.t==='gasto'&&m.c===cid)s-=m.m;if(m.t==='transf'){if(m.c===cid)s-=m.m;if(m.dest===cid)s+=m.m}});
  return s;
 }
+function infoTarjeta(c){const s=saldo(c.id),deuda=Math.max(0,-s),linea=+c.linea||0;return{saldo:s,deuda,linea,disp:linea-deuda,pct:linea>0?deuda/linea*100:0}}
 const colorPct=p=>p>=100?'var(--gas)':p>=80?'var(--warn)':'var(--ing)';
 function mvHTML(m){
  const c=CUENTAS.find(x=>x.id===m.c)||{n:'?'};
@@ -274,7 +282,12 @@ function render(){
  document.getElementById('totIng').textContent=fmt(ing);
  document.getElementById('totGas').textContent=fmt(gas);
  document.getElementById('saldoTotal').textContent=fmt(CUENTAS.reduce((a,c)=>a+saldo(c.id),0));
- document.getElementById('cuentas').innerHTML=CUENTAS.map(c=>{const s=saldo(c.id);return`<div class="acc row"><div>${c.ic} ${esc(c.n)}<br><small>${tipoTxt(c.tipo)}</small></div><b class="${s<0?'g':''}">${fmt(s)}</b></div>`}).join('');
+ document.getElementById('cuentas').innerHTML=CUENTAS.map(c=>{const s=saldo(c.id);
+  if(c.tipo==='tarjeta'&&+c.linea>0){const t=infoTarjeta(c);
+   return`<div class="acc"><div class="row"><div>${c.ic} ${esc(c.n)}<br><small>Tarjeta de crédito</small></div><b class="${t.disp<0?'g':''}">${fmt(t.disp)}</b></div>
+   <div class="bar"><span style="width:${Math.min(t.pct,100)}%;background:${colorPct(t.pct)}"></span></div>
+   <div class="tc"><div><span>Línea</span><b>${fmt(t.linea)}</b></div><div><span>Gastado</span><b class="g">${fmt(t.deuda)}</b></div><div><span>Disponible</span><b style="color:${t.disp<0?'var(--gas)':'var(--ing)'}">${fmt(t.disp)}</b></div></div></div>`}
+  return`<div class="acc row"><div>${c.ic} ${esc(c.n)}<br><small>${tipoTxt(c.tipo)}</small></div><b class="${s<0?'g':''}">${fmt(s)}</b></div>`}).join('');
  const pd=presData(), tp=pd.reduce((a,b)=>a+b.pres,0), tg=pd.reduce((a,b)=>a+b.g,0), pp=tp>0?tg/tp*100:0;
  const alertas=pd.filter(c=>c.p>=80).sort((a,b)=>b.p-a.p);
  document.getElementById('presResumen').innerHTML=`<div class="row"><b>${fmt(tg)}</b><small style="color:var(--mut)">de ${fmt(tp)}</small></div><div class="bar"><span style="width:${Math.min(pp,100)}%;background:${colorPct(pp)}"></span></div>`+
@@ -330,6 +343,12 @@ function pintarForm(){
  document.getElementById('boxDestino').style.display=tr?'block':'none';
  document.getElementById('boxCat').style.display=tr?'none':'block';
  chips('chCuenta',CUENTAS.map(c=>({v:c.id,l:c.ic+' '+c.n})),F.c,v=>{F.c=v;pintarForm()});
+ {const ca=CUENTAS.find(x=>x.id===F.c),cd=document.getElementById('cDisp');
+  if(ca&&ca.tipo==='tarjeta'&&+ca.linea>0){const t=infoTarjeta(ca);
+   let disp=t.disp;if(F.id){const o=MOVS.find(x=>x.id===F.id);if(o&&o.c===ca.id&&o.t==='gasto')disp+=o.m}
+   const tras=F.t==='gasto'?disp-n:disp;
+   cd.innerHTML=`Crédito disponible: <b style="color:#fff">${fmt(disp)}</b>`+(F.t==='gasto'&&n>0?` → queda <b style="color:${tras<0?'var(--gas)':'var(--ing)'}">${fmt(tras)}</b>`:'');cd.style.display='block'}
+  else cd.style.display='none'}
  chips('chDestino',CUENTAS.filter(c=>c.id!==F.c).map(c=>({v:c.id,l:c.ic+' '+c.n})),F.dest,v=>{F.dest=v;pintarForm()});
  if(!tr){const cs=CATS[F.t];chips('chCat',cs.map(c=>({v:c.n,l:c.ic+' '+c.n})),F.cat,v=>{F.cat=v;F.sub=null;pintarForm()});
   const cat=cs.find(c=>c.n===F.cat);document.getElementById('chSub').innerHTML=cat?'':'<small style="color:var(--mut);font-size:12px">Elige una categoría</small>';
@@ -372,7 +391,7 @@ const val=id=>$(id).value.trim();
 let ajTipo='gasto', icSel='';
 function renderAjustes(){
  const ur=$('ultResp');if(ur)ur.textContent=META.ultResp?`Último respaldo: ${new Date(META.ultResp+'T12:00').toLocaleDateString('es-PE')}. Te recomiendo uno al mes.`:'Aún no has hecho un respaldo. Te recomiendo uno al mes.';
- $('ajCuentas').innerHTML=CUENTAS.map((c,i)=>`<div class="acc row" onclick="editCuenta(${i})"><div>${c.ic} ${esc(c.n)}<br><small>${tipoTxt(c.tipo)} · Saldo inicial ${fmt(+c.ini||0)}</small></div><span class="chev">›</span></div>`).join('')+`<button class="addrow" onclick="editCuenta(-1)">+ Agregar cuenta</button>`;
+ $('ajCuentas').innerHTML=CUENTAS.map((c,i)=>`<div class="acc row" onclick="editCuenta(${i})"><div>${c.ic} ${esc(c.n)}<br><small>${tipoTxt(c.tipo)} · Saldo inicial ${fmt(+c.ini||0)}${c.tipo==='tarjeta'?' · Línea '+fmt(+c.linea||0):''}</small></div><span class="chev">›</span></div>`).join('')+`<button class="addrow" onclick="editCuenta(-1)">+ Agregar cuenta</button>`;
  document.querySelectorAll('#ajSeg button').forEach(b=>b.classList.toggle('on',b.dataset.t===ajTipo));
  const lista=CATS[ajTipo];
  const tot=ajTipo==='gasto'?`<div class="tot">Presupuesto mensual total: <b>${fmt(lista.reduce((a,c)=>a+(+c.pres||0),0))}</b></div>`:'';
@@ -393,15 +412,16 @@ function editCuenta(i){
  <label class="fl">Nombre</label><input class="note" id="fN" value="${esc(c.n)}" placeholder="Ej. Ahorros Interbank">
  <label class="fl">Tipo</label><div class="seg" id="fT">${[['efectivo','Efectivo'],['banco','Banco'],['tarjeta','Tarjeta']].map(([v,l])=>`<button data-v="${v}" class="${tipo===v?'on':''}">${l}</button>`).join('')}</div>
  <label class="fl">Saldo inicial (S/)</label><input class="note" id="fI" type="number" inputmode="decimal" step="0.01" value="${+c.ini||0}">
- <small class="hint">Para tarjetas de crédito, ingresa la deuda actual en negativo (ej. -500).</small>
+ <small class="hint" id="hIni">Para tarjetas de crédito, ingresa la deuda actual en negativo (ej. -500).</small>
+ <div id="boxLinea" style="display:${tipo==='tarjeta'?'block':'none'}"><label class="fl">Línea de crédito (S/)</label><input class="note" id="fL" type="number" inputmode="decimal" step="0.01" value="${+c.linea||0}" placeholder="Ej. 10000"></div>
  <label class="fl">Ícono</label>${iconPicker(c.ic)}
  <div class="btns">${i>=0?'<button class="btn danger" id="fDel">Eliminar</button>':''}<button class="btn ghost" onclick="cerrarModal()">Cancelar</button><button class="btn" id="fOk">Guardar</button></div>`);
  activarIconos();
- document.querySelectorAll('#fT button').forEach(b=>b.onclick=()=>{tipo=b.dataset.v;document.querySelectorAll('#fT button').forEach(x=>x.classList.toggle('on',x===b))});
+ document.querySelectorAll('#fT button').forEach(b=>b.onclick=()=>{tipo=b.dataset.v;$('boxLinea').style.display=tipo==='tarjeta'?'block':'none';document.querySelectorAll('#fT button').forEach(x=>x.classList.toggle('on',x===b))});
  $('fOk').onclick=()=>{const n=val('fN');if(!n)return toast('Escribe un nombre');
   if(CUENTAS.some((x,j)=>j!==i&&x.n.toLowerCase()===n.toLowerCase()))return toast('Ya existe una cuenta con ese nombre');
-  const ini=parseFloat($('fI').value)||0;
-  if(i>=0)Object.assign(CUENTAS[i],{n,ic:icSel,tipo,ini});else CUENTAS.push({id:'c'+Date.now(),n,ic:icSel,tipo,ini});
+  const ini=parseFloat($('fI').value)||0, linea=tipo==='tarjeta'?Math.max(0,parseFloat($('fL').value)||0):0;
+  if(i>=0)Object.assign(CUENTAS[i],{n,ic:icSel,tipo,ini,linea});else CUENTAS.push({id:'c'+Date.now(),n,ic:icSel,tipo,ini,linea});
   guardarTodo('✓ Cuenta guardada')};
  if(i>=0)$('fDel').onclick=()=>{const u=MOVS.filter(m=>m.c===c.id||m.dest===c.id).length;
   if(u)return toast(`Tiene ${u} movimientos; no se puede eliminar`);
