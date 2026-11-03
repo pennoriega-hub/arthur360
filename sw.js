@@ -1,5 +1,5 @@
 // Arthur360 – service worker: permite usar la app sin internet
-const CACHE = 'arthur360-v4';
+const CACHE = 'arthur360-v5';
 const ARCHIVOS = [
   './',
   './index.html',

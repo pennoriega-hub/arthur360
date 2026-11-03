@@ -141,7 +141,7 @@ input[type=date].note{color-scheme:dark}
     <button class="btn full" onclick="ir('ajustes')">Ir a Ajustes</button>
   </div>
   <div class="card">
-    <div class="lbl">Saldo total</div>
+    <div class="lbl">Saldo total <span style="color:var(--mut);text-transform:none;font-weight:400">· sin tarjetas</span></div>
     <div class="big" id="saldoTotal"></div>
     <div class="duo">
       <div><span class="lbl">Ingresos</span><b class="i" id="totIng"></b></div>
@@ -196,7 +196,7 @@ input[type=date].note{color-scheme:dark}
     <button class="btn danger full" onclick="confirmar('¿Borrar todos los movimientos? Cuentas y categorías se mantienen.',()=>{MOVS=[];guardarTodo('Movimientos borrados')},'Borrar')">🗑 Borrar todos los movimientos</button>
     <small class="hint" id="ultResp" style="margin-top:8px"></small>
   </div>
-  <p class="proto">Arthur360 · v1.3</p>
+  <p class="proto">Arthur360 · v1.4</p>
 </section>
 
 <nav>
@@ -291,10 +291,11 @@ function render(){
  const m=mesSel();
  document.getElementById('mesLbl').textContent=m.toLocaleDateString('es-PE',{month:'long',year:'numeric'});
  const del=MOVS.filter(x=>enMes(x.f));
- const ing=del.filter(x=>x.t==='ingreso').reduce((a,b)=>a+b.m,0), gas=del.filter(x=>x.t==='gasto').reduce((a,b)=>a+b.m,0);
+ const delSC=del.filter(x=>!esTarjeta(x.c));
+ const ing=delSC.filter(x=>x.t==='ingreso').reduce((a,b)=>a+b.m,0), gas=delSC.filter(x=>x.t==='gasto').reduce((a,b)=>a+b.m,0);
  document.getElementById('totIng').textContent=fmt(ing);
  document.getElementById('totGas').textContent=fmt(gas);
- document.getElementById('saldoTotal').textContent=fmt(CUENTAS.reduce((a,c)=>a+saldo(c.id),0));
+ document.getElementById('saldoTotal').textContent=fmt(CUENTAS.filter(c=>c.tipo!=='tarjeta').reduce((a,c)=>a+saldo(c.id),0));
  document.getElementById('cuentas').innerHTML=CUENTAS.map(c=>{const s=saldo(c.id);
   if(c.tipo==='tarjeta'&&+c.linea>0){const t=infoTarjeta(c);
    return`<div class="acc"><div class="row"><div>${c.ic} ${esc(c.n)}<br><small>Tarjeta de crédito</small></div><b class="${t.disp<0?'g':''}">${fmt(t.disp)}</b></div>
