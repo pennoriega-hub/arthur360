@@ -70,7 +70,10 @@ input.note{width:100%;background:var(--soft);border:1px solid var(--line);border
 .keys button.op{background:var(--pri);color:#fff;font-size:24px}
 .keys button.eq{background:var(--sec);color:#fff;font-size:24px}
 .amtres{text-align:center;font-size:15px;color:var(--mut);margin:-8px 0 8px;min-height:20px}
-.keys button{border:0;background:var(--soft);color:#fff;border-radius:12px;height:50px;font:inherit;font-size:20px;font-weight:500}
+.keys button{border:0;background:var(--soft);color:#fff;border-radius:12px;height:50px;font:inherit;font-size:20px;font-weight:500;transition:transform .08s,background .08s,box-shadow .08s;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.keys button.pres,.keys button:active{transform:scale(.9);background:#3b4a63;box-shadow:inset 0 0 0 2px var(--sec)}
+.keys button.op.pres,.keys button.op:active{background:var(--pri2)}
+.keys button.eq.pres,.keys button.eq:active{background:#ffa057}
 .save{width:100%;border:0;background:var(--pri2);color:#fff;border-radius:14px;height:52px;font:inherit;font-size:16px;font-weight:600;margin-top:10px}
 .save:disabled{opacity:.4}
 .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--sec);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:20;display:none}
@@ -115,6 +118,11 @@ input[type=date].note{color-scheme:dark}
 .tc b{font-size:13px}
 .acc .bar{margin:8px 0 0}
 .cdisp{font-size:12px;color:var(--mut);margin:-4px 0 8px}
+.pt{padding:10px 0;border-bottom:1px solid var(--line)}
+.pt:last-child{border:0}
+.pt .det{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:3px}
+.pt.total{font-weight:700}
+.rc small b{color:#fff;font-weight:500}
 .proto{font-size:11px;text-align:center;color:var(--mut);padding:6px}
 </style>
 </head>
@@ -142,7 +150,11 @@ input[type=date].note{color-scheme:dark}
   </div>
   <h2>Cuentas</h2>
   <div class="card" id="cuentas" style="padding-top:4px;padding-bottom:4px"></div>
-  <h2>Presupuesto del mes</h2>
+  <div id="secTC"><h2>Gastos a pagar con tarjeta</h2>
+  <div class="card" id="pagarTC" style="padding-top:4px;padding-bottom:6px"></div></div>
+  <h2>Gastos del mes por categoría</h2>
+  <div class="card" id="resCat" style="padding-top:4px;padding-bottom:4px"></div>
+  <h2>Presupuesto del mes <small style="font-size:11px;color:var(--mut);font-weight:400">(sin tarjetas)</small></h2>
   <div class="card" id="presResumen" onclick="ir('presupuesto')"></div>
   <h2>Últimos movimientos</h2>
   <div class="card" id="ultimos" style="padding-top:4px;padding-bottom:4px"></div>
@@ -184,7 +196,7 @@ input[type=date].note{color-scheme:dark}
     <button class="btn danger full" onclick="confirmar('¿Borrar todos los movimientos? Cuentas y categorías se mantienen.',()=>{MOVS=[];guardarTodo('Movimientos borrados')},'Borrar')">🗑 Borrar todos los movimientos</button>
     <small class="hint" id="ultResp" style="margin-top:8px"></small>
   </div>
-  <p class="proto">Arthur360 · v1.2</p>
+  <p class="proto">Arthur360 · v1.3</p>
 </section>
 
 <nav>
@@ -269,8 +281,9 @@ function mvHTML(m){
   return `<div class="mv" onclick="editarMov('${m.id}')"><div class="ic">🔁</div><div class="t"><div>${esc(m.nota||'Transferencia')}</div><small>${esc(c.n)} → ${esc(de.n)}</small></div><div class="m">${fmt(m.m)}</div></div>`}
  return `<div class="mv" onclick="editarMov('${m.id}')"><div class="ic">${icCat(m.cat)}</div><div class="t"><div>${esc(m.sub)}</div><small>${esc(m.cat)} · ${esc(c.n)}${m.nota?' · '+esc(m.nota):''}</small></div><div class="m ${m.t==='gasto'?'g':'i'}">${m.t==='gasto'?'-':'+'}${fmt(m.m)}</div></div>`;
 }
+const esTarjeta=id=>CUENTAS.find(c=>c.id===id)?.tipo==='tarjeta';
 function presData(){
- const del=MOVS.filter(m=>m.t==='gasto'&&enMes(m.f));
+ const del=MOVS.filter(m=>m.t==='gasto'&&enMes(m.f)&&!esTarjeta(m.c));
  return CATS.gasto.map(c=>{const ms=del.filter(m=>m.cat===c.n);const g=ms.reduce((a,b)=>a+b.m,0);
   const subs=c.subs.map(s=>({n:s,g:ms.filter(m=>m.sub===s).reduce((a,b)=>a+b.m,0)}));return{...c,pres:c.pres||0,g,p:c.pres>0?g/c.pres*100:(g>0?100:0),subs}});
 }
@@ -292,6 +305,24 @@ function render(){
  const alertas=pd.filter(c=>c.p>=80).sort((a,b)=>b.p-a.p);
  document.getElementById('presResumen').innerHTML=`<div class="row"><b>${fmt(tg)}</b><small style="color:var(--mut)">de ${fmt(tp)}</small></div><div class="bar"><span style="width:${Math.min(pp,100)}%;background:${colorPct(pp)}"></span></div>`+
   (alertas.length?alertas.map(c=>`<div class="row" style="font-size:13px;padding-top:6px"><span>${c.ic} ${esc(c.n)}</span><b style="color:${colorPct(c.p)}">${Math.round(c.p)}%</b></div>`).join(''):'<small style="color:var(--mut)">Todo en orden 👍</small>');
+ // gastos a pagar con tarjeta
+ const tarjetas=CUENTAS.filter(c=>c.tipo==='tarjeta');
+ document.getElementById('secTC').style.display=tarjetas.length?'block':'none';
+ if(tarjetas.length){let tot=0;
+  const filas=tarjetas.map(c=>{const ms=del.filter(x=>x.c===c.id);
+   const cons=ms.filter(x=>x.t==='gasto').reduce((a,b)=>a+b.m,0), dev=ms.filter(x=>x.t==='ingreso').reduce((a,b)=>a+b.m,0);
+   const pag=del.filter(x=>x.t==='transf'&&x.dest===c.id).reduce((a,b)=>a+b.m,0)-del.filter(x=>x.t==='transf'&&x.c===c.id).reduce((a,b)=>a+b.m,0);
+   const ap=Math.max(0,cons-dev-pag);tot+=ap;
+   return`<div class="pt"><div class="row"><span>${c.ic} ${esc(c.n)}</span><b class="${ap>0?'g':'i'}">${ap>0?fmt(ap):'✓ Pagado'}</b></div><div class="det"><span>Gastos ${fmt(cons)}</span><span>Ingresos −${fmt(dev)}</span><span>Pagos −${fmt(Math.max(0,pag))}</span></div></div>`});
+  document.getElementById('pagarTC').innerHTML=filas.join('')+(tarjetas.length>1?`<div class="pt total row"><span>Total pendiente</span><span class="${tot>0?'g':'i'}">${fmt(tot)}</span></div>`:'')}
+ // resumen por categoría (todas las cuentas)
+ {const gm=del.filter(x=>x.t==='gasto'), totG=gm.reduce((a,b)=>a+b.m,0);
+  const nombres=[...new Set([...CATS.gasto.map(c=>c.n),...gm.map(x=>x.cat)])];
+  const rc=nombres.map(n=>{const ms=gm.filter(x=>x.cat===n),g=ms.reduce((a,b)=>a+b.m,0),tc=ms.filter(x=>esTarjeta(x.c)).reduce((a,b)=>a+b.m,0);
+    const subs=[...new Set(ms.map(x=>x.sub))].map(sn=>({n:sn,g:ms.filter(x=>x.sub===sn).reduce((a,b)=>a+b.m,0)})).sort((a,b)=>b.g-a.g);
+    return{n,ic:icCat(n),g,tc,subs}}).filter(x=>x.g>0).sort((a,b)=>b.g-a.g);
+  document.getElementById('resCat').innerHTML=rc.length?`<div class="tot" style="padding-top:10px">Total gastado: <b>${fmt(totG)}</b></div>`+rc.map(c=>{const pc=totG>0?c.g/totG*100:0;
+   return`<div class="bud rc" onclick="this.classList.toggle('open')"><div class="row"><span>${c.ic} <b style="font-weight:600">${esc(c.n)}</b></span><b>${fmt(c.g)}</b></div><div class="bar"><span style="width:${pc}%;background:var(--sec)"></span></div><div class="row"><small>${Math.round(pc)}% del total</small><small>${c.tc>0?'Con tarjeta: <b>'+fmt(c.tc)+'</b>':''}</small></div><div class="sub">${c.subs.map(x=>`<div class="row"><span>${esc(x.n)}</span><span>${fmt(x.g)}</span></div>`).join('')}</div></div>`}).join(''):'<div class="empty">Sin gastos este mes</div>'}
  const ult=[...del].sort((a,b)=>b.f.localeCompare(a.f)||MOVS.indexOf(b)-MOVS.indexOf(a)).slice(0,5);
  document.getElementById('welcome').style.display=META.nuevo&&!MOVS.length?'block':'none';
  document.getElementById('ultimos').innerHTML=ult.length?ult.map(mvHTML).join(''):'<div class="empty">Sin movimientos este mes</div>';
@@ -304,7 +335,7 @@ function render(){
  // presupuesto
  document.getElementById('presTot').textContent=fmt(tg);
  document.getElementById('presTotBar').style.cssText=`width:${Math.min(pp,100)}%;background:${colorPct(pp)}`;
- document.getElementById('presTotTxt').textContent=`${Math.round(pp)}% de ${fmt(tp)} · Quedan ${fmt(tp-tg)}`;
+ document.getElementById('presTotTxt').textContent=`${Math.round(pp)}% de ${fmt(tp)} · Quedan ${fmt(tp-tg)} · No incluye gastos con tarjeta`;
  document.getElementById('presLista').innerHTML=pd.map(c=>`<div class="bud" onclick="this.classList.toggle('open')"><div class="row"><span>${c.ic} <b style="font-weight:600">${esc(c.n)}</b></span><b style="color:${colorPct(c.p)}">${Math.round(c.p)}%</b></div><div class="bar"><span style="width:${Math.min(c.p,100)}%;background:${colorPct(c.p)}"></span></div><div class="row"><small>${fmt(c.g)} de ${fmt(c.pres)}</small><small>${c.pres-c.g>=0?'Quedan '+fmt(c.pres-c.g):'Excedido '+fmt(c.g-c.pres)}</small></div><div class="sub">${c.subs.map(s=>`<div class="row"><span>${esc(s.n)}</span><span>${fmt(s.g)}</span></div>`).join('')}</div></div>`).join('');
 }
 const TITULOS={inicio:'Inicio',movs:'Movimientos',presupuesto:'Presupuesto',ajustes:'Ajustes'};
@@ -361,6 +392,10 @@ const tieneOp=e=>/[0-9.][+\-]/.test(e);
 const verExpr=e=>(e||'0').replace(/\+/g,' + ').replace(/-/g,' − ');
 const KEYS=['1','2','3','⌫','4','5','6','−','7','8','9','+','C','0','.','='];
 document.getElementById('keys').innerHTML=KEYS.map(k=>`<button class="${k==='+'||k==='−'?'op':k==='='?'eq':''}" data-k="${k}">${k}</button>`).join('');
+document.querySelectorAll('#keys button').forEach(b=>{
+ b.addEventListener('pointerdown',()=>{b.classList.add('pres');try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}});
+ ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>setTimeout(()=>b.classList.remove('pres'),90)));
+});
 document.querySelectorAll('#keys button').forEach(b=>b.onclick=()=>{let k=b.dataset.k;if(k==='−')k='-';
  let e=F.monto||'';
  if(F.reemplazar&&(/[0-9.]/.test(k)))e='';
